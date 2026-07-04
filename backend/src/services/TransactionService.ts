@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../shared/database/prisma.js";
 import { fromMonthInput, normalizeText, parseAmount, parseDate, titleName, toCompetence } from "../shared/utils/format.js";
 import { classifyNormalized } from "./ClassificationEngine.js";
+import { signedAmount } from "./shared/FinancialMathService.js";
 import {
   FinancialNature,
   inferPaymentMethod,
@@ -98,12 +99,6 @@ function natureToTransactionType(nature: FinancialNature): TransactionType {
 
 function manualHash() {
   return crypto.createHash("sha256").update(`manual|${crypto.randomUUID()}|${Date.now()}`).digest("hex");
-}
-
-function signedAmount(item: { amount: unknown; transactionType: string }) {
-  const amount = Number(item.amount ?? 0);
-  if (item.transactionType === "Entrada" || item.transactionType === "Estorno") return amount;
-  return -amount;
 }
 
 function toEntry(item: Awaited<ReturnType<typeof prisma.financialTransaction.findMany>>[number]) {

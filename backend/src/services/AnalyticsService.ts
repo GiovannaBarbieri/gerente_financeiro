@@ -1,5 +1,6 @@
 import { prisma } from "../shared/database/prisma.js";
-import { fromMonthInput, money } from "../shared/utils/format.js";
+import { fromMonthInput } from "../shared/utils/format.js";
+import { absoluteAmount, isExpense, isIncome, isPendingReview, signedAmount, sumAbsoluteAmounts } from "./shared/FinancialMathService.js";
 
 type Row = Awaited<ReturnType<typeof prisma.financialTransaction.findMany>>[number];
 
@@ -22,30 +23,8 @@ type CacheEntry = {
 const cache = new Map<string, CacheEntry>();
 const CACHE_MS = 45_000;
 
-function signedAmount(item: Row) {
-  const amount = money(item.amount);
-  if (item.transactionType === "Entrada" || item.transactionType === "Estorno") return amount;
-  return -amount;
-}
-
-function absAmount(item: Row) {
-  return Math.abs(money(item.amount));
-}
-
-function sum(rows: Row[], value = absAmount) {
-  return rows.reduce((total, row) => total + value(row), 0);
-}
-
-function isIncome(item: Row) {
-  return item.financialNature === "Receita" || item.transactionType === "Entrada";
-}
-
-function isExpense(item: Row) {
-  return item.realConsumptionImpact && item.financialNature === "Despesa";
-}
-
-function isPending(item: Row) {
-  return item.reviewStatus === "Pending" || item.status === "pending" || item.category === "Outros" || item.origin === "Outro";
+function sum(rows: Row[], value = absoluteAmount) {
+  return sumAbsoluteAmounts(rows, value);
 }
 
 function parseCompetence(competence: string) {
@@ -116,7 +95,7 @@ function topRows(rows: Row[], predicate: (row: Row) => boolean, take = 10) {
   return rows
     .filter(predicate)
     .slice()
-    .sort((a, b) => absAmount(b) - absAmount(a))
+    .sort((a, b) => absoluteAmount(b) - absoluteAmount(a))
     .slice(0, take)
     .map((row) => ({
       id: row.id,
@@ -170,10 +149,10 @@ export async function analyticsDashboard(filters: AnalyticsFilters) {
   const cardRows = allRows.filter((row) => row.sourceType === "Cartao" && row.realConsumptionImpact && !row.reconciled);
   const today = new Date();
   const overdue = allRows.filter((row) => row.dueDate && row.dueDate < today && !["paid", "cleared", "reviewed"].includes(String(row.status ?? "").toLowerCase()));
-  const pendingRows = allRows.filter(isPending);
+  const pendingRows = allRows.filter(isPendingReview);
 
-  const categories = groupBy(rows.filter(isExpense), (row) => row.category, absAmount).sort((a, b) => b.amount - a.amount);
-  const previousCategories = groupBy(previousRows.filter(isExpense), (row) => row.category, absAmount);
+  const categories = groupBy(rows.filter(isExpense), (row) => row.category, absoluteAmount).sort((a, b) => b.amount - a.amount);
+  const previousCategories = groupBy(previousRows.filter(isExpense), (row) => row.category, absoluteAmount);
   const categoryComparison = categories.map((item) => {
     const previousAmount = previousCategories.find((prev) => prev.name === item.name)?.amount ?? 0;
     return { ...item, previousAmount, variation: pct(item.amount, previousAmount) };
@@ -267,7 +246,7 @@ export async function analyticsDashboard(filters: AnalyticsFilters) {
     top: {
       expenses: topRows(rows, isExpense),
       revenues: topRows(rows, isIncome),
-      establishments: groupBy(expenseRows, (row) => row.personCompany, absAmount).sort((a, b) => b.amount - a.amount).slice(0, 10),
+      establishments: groupBy(expenseRows, (row) => row.personCompany, absoluteAmount).sort((a, b) => b.amount - a.amount).slice(0, 10),
       categories: categories.slice(0, 10)
     },
     indicators: {

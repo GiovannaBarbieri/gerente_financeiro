@@ -9,6 +9,7 @@ import { createRawHash } from "./HashService.js";
 import { inferAccountName, inferInstitution } from "./InstitutionInferenceService.js";
 import { normalizeParsedTransaction, SourceType, toPrismaFinancialTransaction } from "./NormalizationEngine.js";
 import { identifyParser, ParserContext } from "./Parsers.js";
+import { isPendingReview } from "./shared/FinancialMathService.js";
 
 type Uploaded = { path: string; originalname: string; mimetype?: string };
 
@@ -322,7 +323,7 @@ export async function confirmBatchImport(importBatchId: string, selectedFileIds?
           if (classified.transactionType === "Entrada") totalEntradas += Number(classified.amount);
           if (classified.sourceType === "Conta" && classified.transactionType === "Saida") totalSaidas += Number(classified.amount);
           if (classified.sourceType === "Cartao" && classified.realConsumptionImpact) totalComprasCartao += Number(classified.amount);
-          if (classified.reviewStatus === "Pending" || classified.category === "Outros" || classified.origin === "Outro") pendingReview += 1;
+          if (isPendingReview(classified)) pendingReview += 1;
         } catch {
           fileErrors += 1;
           errorRows += 1;

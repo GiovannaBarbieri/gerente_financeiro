@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../shared/database/prisma.js";
 import { fromMonthInput, money, normalizeText } from "../shared/utils/format.js";
+import { isExpense, isPendingReview, signedAmount, sumAmounts } from "./shared/FinancialMathService.js";
 
 type FinancialRow = Awaited<ReturnType<typeof prisma.financialTransaction.findMany>>[number];
 
@@ -10,13 +11,7 @@ function competenceWhere(month?: string) {
 }
 
 function sum(values: Array<{ amount: unknown }>) {
-  return values.reduce((total, item) => total + money(item.amount), 0);
-}
-
-function signedAmount(item: FinancialRow) {
-  const amount = money(item.amount);
-  if (item.transactionType === "Entrada" || item.transactionType === "Estorno") return amount;
-  return -amount;
+  return sumAmounts(values);
 }
 
 function groupBy<T>(rows: T[], key: (row: T) => string, value: (row: T) => number) {
@@ -34,7 +29,7 @@ function isCashIn(item: FinancialRow) {
 }
 
 function isRealExpense(item: FinancialRow) {
-  return item.realConsumptionImpact && item.financialNature === "Despesa";
+  return isExpense(item);
 }
 
 function isCreditCardPayment(item: FinancialRow) {
@@ -72,7 +67,7 @@ export async function executiveDashboard() {
   const realExpenseRows = rows.filter(isRealExpense);
   const cardOpenRows = rows.filter((item) => item.sourceType === "Cartao" && item.realConsumptionImpact && !item.reconciled);
   const investments = rows.filter((item) => item.financialNature === "Investimento");
-  const pendingRows = rows.filter((item) => item.reviewStatus === "Pending" || item.category === "Outros" || item.origin === "Outro");
+  const pendingRows = rows.filter(isPendingReview);
 
   const metrics = {
     saldoAtual: cashRows.reduce((total, item) => total + signedAmount(item), 0),

@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../shared/database/prisma.js";
 import { parseAmount, parseDate } from "../shared/utils/format.js";
 import { createFinancialEntry } from "./TransactionService.js";
+import { signedAmount } from "./shared/FinancialMathService.js";
 
 export async function listAccounts() {
   const [accounts, rows] = await Promise.all([
@@ -12,7 +13,7 @@ export async function listAccounts() {
   return accounts.map((account) => {
     const movement = rows
       .filter((row) => row.accountName === account.name)
-      .reduce((total, row) => total + (row.transactionType === "Entrada" || row.transactionType === "Estorno" ? Number(row.amount) : -Number(row.amount)), 0);
+      .reduce((total, row) => total + signedAmount(row), 0);
     return { ...account, currentBalance: Number(account.initialBalance) + movement };
   });
 }
