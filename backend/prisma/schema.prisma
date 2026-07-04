@@ -1,0 +1,594 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("users")
+}
+
+model Account {
+  id           Int           @id @default(autoincrement())
+  name         String
+  bank         String?
+  type         String
+  initialBalance Decimal     @default(0) @map("initial_balance")
+  currentBalance Decimal     @default(0) @map("current_balance")
+  color        String?
+  icon         String?
+  status       String        @default("Active")
+  defaultAccount Boolean     @default(false) @map("default_account")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  transactions Transaction[]
+  paymentCards Card[]        @relation("CardPaymentAccount")
+
+  @@map("accounts")
+}
+
+model Card {
+  id               Int                    @id @default(autoincrement())
+  name             String
+  bank             String?
+  brand            String?
+  color            String?
+  closingDay       Int?                   @map("closing_day")
+  dueDay           Int?                   @map("due_day")
+  limitAmount      Decimal?               @map("limit_amount")
+  availableLimit   Decimal?               @map("available_limit")
+  status           String                 @default("Active")
+  paymentAccountId Int?                   @map("payment_account_id")
+  createdAt        DateTime               @default(now()) @map("created_at")
+  purchases        CreditCardPurchase[]
+  transactions     Transaction[]
+  reconciliations  InvoiceReconciliation[]
+  paymentAccount   Account?               @relation("CardPaymentAccount", fields: [paymentAccountId], references: [id])
+
+  @@map("cards")
+}
+
+model Import {
+  id        Int                  @id @default(autoincrement())
+  fileName  String               @map("file_name")
+  fileType  String               @map("file_type")
+  sourceType String              @map("source_type")
+  importedAt DateTime            @default(now()) @map("imported_at")
+  totalRows Int                  @default(0) @map("total_rows")
+  status    String               @default("processed")
+  transactions Transaction[]
+  purchases CreditCardPurchase[]
+  rawRecords RawImportRecord[]
+
+  @@map("imports")
+}
+
+model Transaction {
+  id                  Int       @id @default(autoincrement())
+  date                DateTime
+  month               String
+  type                String
+  source              String
+  description         String
+  personName          String?   @map("person_name")
+  categoryId          Int?      @map("category_id")
+  subcategoryId       Int?      @map("subcategory_id")
+  origin              String    @default("Outros")
+  amount              Decimal
+  accountId           Int?      @map("account_id")
+  cardId              Int?      @map("card_id")
+  importId            Int?      @map("import_id")
+  fingerprint         String    @unique
+  isInternalTransfer  Boolean   @default(false) @map("is_internal_transfer")
+  isCreditCardPayment Boolean   @default(false) @map("is_credit_card_payment")
+  isReconciled        Boolean   @default(false) @map("is_reconciled")
+  notes               String?
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  account     Account?     @relation(fields: [accountId], references: [id])
+  card        Card?        @relation(fields: [cardId], references: [id])
+  import      Import?      @relation(fields: [importId], references: [id])
+  category    Category?    @relation(fields: [categoryId], references: [id])
+  subcategory Subcategory? @relation(fields: [subcategoryId], references: [id])
+  reconciliation InvoiceReconciliation?
+
+  @@index([month])
+  @@index([source])
+  @@index([categoryId])
+  @@map("transactions")
+}
+
+model CreditCardPurchase {
+  id                 Int      @id @default(autoincrement())
+  date               DateTime
+  month              String
+  description        String
+  amount             Decimal
+  cardId             Int?     @map("card_id")
+  invoiceMonth       String?  @map("invoice_month")
+  categoryId         Int?     @map("category_id")
+  subcategoryId      Int?     @map("subcategory_id")
+  origin             String   @default("Cartao")
+  importId           Int?     @map("import_id")
+  fingerprint        String   @unique
+  installmentNumber  Int?     @map("installment_number")
+  totalInstallments  Int?     @map("total_installments")
+  notes              String?
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  card        Card?        @relation(fields: [cardId], references: [id])
+  import      Import?      @relation(fields: [importId], references: [id])
+  category    Category?    @relation(fields: [categoryId], references: [id])
+  subcategory Subcategory? @relation(fields: [subcategoryId], references: [id])
+
+  @@index([month])
+  @@index([invoiceMonth])
+  @@index([categoryId])
+  @@map("credit_card_purchases")
+}
+
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  type      String   @default("expense")
+  icon      String?
+  color     String?
+  status    String   @default("Active")
+  sortOrder Int      @default(0) @map("sort_order")
+  favorite  Boolean  @default(false)
+  hidden    Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  subcategories Subcategory[]
+  rules         ClassificationRule[]
+  transactions  Transaction[]
+  purchases     CreditCardPurchase[]
+
+  @@map("categories")
+}
+
+model Subcategory {
+  id         Int      @id @default(autoincrement())
+  categoryId Int     @map("category_id")
+  name       String
+  icon       String?
+  color      String?
+  status     String   @default("Active")
+  sortOrder  Int      @default(0) @map("sort_order")
+  favorite   Boolean  @default(false)
+  hidden     Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  category     Category @relation(fields: [categoryId], references: [id])
+  rules        ClassificationRule[]
+  transactions Transaction[]
+  purchases    CreditCardPurchase[]
+
+  @@unique([categoryId, name])
+  @@map("subcategories")
+}
+
+model ClassificationRule {
+  id            Int      @id @default(autoincrement())
+  keyword       String
+  normalizedKeyword String? @map("normalized_keyword")
+  matchType     String   @default("CONTAINS") @map("match_type")
+  sourceType    String   @default("all") @map("source_type")
+  categoryId    Int?     @map("category_id")
+  subcategoryId Int?     @map("subcategory_id")
+  categoryName  String?  @map("category_name")
+  subcategoryName String? @map("subcategory_name")
+  financialNature String @default("Despesa") @map("financial_nature")
+  origin        String   @default("Outros")
+  priority      Int      @default(100)
+  confidence    Int      @default(80)
+  createdBy     String   @default("SYSTEM") @map("created_by")
+  userId        Int?     @map("user_id")
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  category    Category?    @relation(fields: [categoryId], references: [id])
+  subcategory Subcategory? @relation(fields: [subcategoryId], references: [id])
+
+  @@index([keyword])
+  @@index([normalizedKeyword])
+  @@map("classification_rules")
+}
+
+model FinancialTransaction {
+  id                    String   @id @default(uuid())
+  userId                Int?     @map("user_id")
+  externalId            String?  @map("external_id")
+  rawRecordId           String?  @map("raw_record_id")
+  importFileId          String?  @map("import_file_id")
+  importBatchGroupId    String?  @map("import_batch_group_id")
+  invoiceId             String?  @map("invoice_id")
+  transactionDate       DateTime @map("transaction_date")
+  competence            String
+  invoiceCompetence     String?  @map("invoice_competence")
+  paymentDate           DateTime? @map("payment_date")
+  paymentCompetence     String?  @map("payment_competence")
+  dueDate               DateTime? @map("due_date")
+  sourceType            String   @map("source_type")
+  institution           String
+  accountName           String   @map("account_name")
+  transactionType       String   @map("transaction_type")
+  financialNature       String   @map("financial_nature")
+  originalDescription   String   @map("original_description")
+  normalizedDescription String   @map("normalized_description")
+  personCompany         String   @map("person_company")
+  amount                Decimal
+  category              String
+  subcategory           String
+  origin                String
+  paymentMethod         String   @map("payment_method")
+  paymentMethodId       Int?     @map("payment_method_id")
+  entryKind             String?  @map("entry_kind")
+  status                String?  @default("pending")
+  cardName              String?  @map("card_name")
+  installment           Int?
+  totalInstallments     Int?     @map("total_installments")
+  reconciled            Boolean  @default(false)
+  transferInternal      Boolean  @default(false) @map("transfer_internal")
+  cashFlowImpact        Boolean  @default(true) @map("cash_flow_impact")
+  realConsumptionImpact Boolean  @default(true) @map("real_consumption_impact")
+  classificationConfidence Int   @default(50) @map("classification_confidence")
+  classificationSource  String  @default("SYSTEM") @map("classification_source")
+  reviewStatus          String  @default("Pending") @map("review_status")
+  importBatch           String   @map("import_batch")
+  importBatchId         Int?    @map("import_batch_id")
+  notes                 String?
+  hash                  String   @unique
+  strictHash            String?  @unique @map("strict_hash")
+  softHash              String?  @map("soft_hash")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  rawRecord RawImportRecord? @relation(fields: [rawRecordId], references: [id])
+  importFile ImportFile? @relation(fields: [importFileId], references: [id])
+  importBatchGroup ImportBatch? @relation(fields: [importBatchGroupId], references: [id])
+  invoice   CreditCardInvoice? @relation(fields: [invoiceId], references: [id])
+  paymentMethodRef PaymentMethod? @relation(fields: [paymentMethodId], references: [id])
+  tags      FinancialTransactionTag[]
+  attachments Attachment[]
+  audits    FinancialEntryAudit[]
+
+  @@index([transactionDate])
+  @@index([competence])
+  @@index([invoiceCompetence])
+  @@index([paymentCompetence])
+  @@index([sourceType])
+  @@index([financialNature])
+  @@index([origin])
+  @@index([category])
+  @@index([importBatch])
+  @@index([importBatchId])
+  @@index([importFileId])
+  @@index([importBatchGroupId])
+  @@index([rawRecordId])
+  @@index([softHash])
+  @@index([paymentMethodId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("financial_transactions")
+}
+
+model RawImportRecord {
+  id                String   @id @default(uuid())
+  userId            Int?     @map("user_id")
+  importBatchId     Int      @map("import_batch_id")
+  importFileId      String?  @map("import_file_id")
+  importBatchGroupId String? @map("import_batch_group_id")
+  sourceType        String   @map("source_type")
+  institution       String
+  originalRowNumber Int      @map("original_row_number")
+  rawJson           Json     @map("raw_json")
+  rawHash           String   @unique @map("raw_hash")
+  processed         Boolean  @default(false)
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  import Import @relation(fields: [importBatchId], references: [id])
+  importFile ImportFile? @relation(fields: [importFileId], references: [id])
+  importBatchGroup ImportBatch? @relation(fields: [importBatchGroupId], references: [id])
+  financialTransactions FinancialTransaction[]
+
+  @@index([importBatchId])
+  @@index([importFileId])
+  @@index([importBatchGroupId])
+  @@index([sourceType])
+  @@index([institution])
+  @@index([processed])
+  @@map("raw_import_records")
+}
+
+model ImportBatch {
+  id        String   @id @default(uuid())
+  userId    Int?     @map("user_id")
+  status    String   @default("Preview")
+  totalFiles Int     @default(0) @map("total_files")
+  totalRows  Int     @default(0) @map("total_rows")
+  createdAt DateTime @default(now()) @map("created_at")
+  importedAt DateTime? @map("imported_at")
+
+  files ImportFile[]
+  rawRecords RawImportRecord[]
+  financialTransactions FinancialTransaction[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("import_batches")
+}
+
+model ImportFile {
+  id             String   @id @default(uuid())
+  importBatchId  String   @map("import_batch_id")
+  legacyImportId Int?     @map("legacy_import_id")
+  fileName       String   @map("file_name")
+  fileType       String   @map("file_type")
+  tempPath       String?  @map("temp_path")
+  sourceType     String   @map("source_type")
+  institution    String
+  parserName     String   @map("parser_name")
+  totalRows      Int      @default(0) @map("total_rows")
+  validRows      Int      @default(0) @map("valid_rows")
+  duplicateRows  Int      @default(0) @map("duplicate_rows")
+  errorRows      Int      @default(0) @map("error_rows")
+  status         String   @default("Preview")
+  errorMessage   String?  @map("error_message")
+  createdAt      DateTime @default(now()) @map("created_at")
+  importedAt     DateTime? @map("imported_at")
+
+  importBatch ImportBatch @relation(fields: [importBatchId], references: [id])
+  rawRecords RawImportRecord[]
+  financialTransactions FinancialTransaction[]
+
+  @@index([importBatchId])
+  @@index([sourceType])
+  @@index([institution])
+  @@index([status])
+  @@map("import_files")
+}
+
+model CreditCardInvoice {
+  id                 String   @id @default(uuid())
+  userId             Int?     @map("user_id")
+  cardId             Int?     @map("card_id")
+  cardName           String?  @map("card_name")
+  invoiceCompetence  String   @map("invoice_competence")
+  closingDate        DateTime? @map("closing_date")
+  dueDate            DateTime? @map("due_date")
+  totalAmount        Decimal  @default(0) @map("total_amount")
+  paidAmount         Decimal  @default(0) @map("paid_amount")
+  difference         Decimal  @default(0)
+  status             String   @default("Open")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  transactions FinancialTransaction[]
+
+  @@index([cardId])
+  @@index([invoiceCompetence])
+  @@index([status])
+  @@map("credit_card_invoices")
+}
+
+model ClassificationFeedback {
+  id                    Int      @id @default(autoincrement())
+  originalDescription   String   @map("original_description")
+  normalizedDescription String   @map("normalized_description")
+  oldCategory           String?  @map("old_category")
+  newCategory           String   @map("new_category")
+  oldOrigin             String?  @map("old_origin")
+  newOrigin             String   @map("new_origin")
+  userId                Int?     @map("user_id")
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  @@index([normalizedDescription])
+  @@index([userId])
+  @@map("classification_feedbacks")
+}
+
+model InvoiceReconciliation {
+  id                   Int      @id @default(autoincrement())
+  accountTransactionId Int      @unique @map("account_transaction_id")
+  cardId               Int?     @map("card_id")
+  invoiceId            String?  @map("invoice_id")
+  paymentTransactionId String?  @map("payment_transaction_id")
+  invoiceMonth         String   @map("invoice_month")
+  invoiceAmount        Decimal  @map("invoice_amount")
+  purchasesAmount      Decimal  @map("purchases_amount")
+  differenceAmount     Decimal  @map("difference_amount")
+  expectedAmount       Decimal? @map("expected_amount")
+  paidAmount           Decimal? @map("paid_amount")
+  difference           Decimal?
+  status               String
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  accountTransaction Transaction @relation(fields: [accountTransactionId], references: [id])
+  card               Card?       @relation(fields: [cardId], references: [id])
+
+  @@index([invoiceMonth])
+  @@index([invoiceId])
+  @@index([paymentTransactionId])
+  @@map("invoice_reconciliations")
+}
+
+model PaymentMethod {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  type      String   @default("Other")
+  icon      String?
+  color     String?
+  status    String   @default("Active")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  financialTransactions FinancialTransaction[]
+  recurringEntries RecurringEntry[]
+
+  @@map("payment_methods")
+}
+
+model Tag {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  color     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  financialTransactions FinancialTransactionTag[]
+
+  @@map("tags")
+}
+
+model FinancialTransactionTag {
+  financialTransactionId String   @map("financial_transaction_id")
+  tagId                  Int      @map("tag_id")
+  createdAt              DateTime @default(now()) @map("created_at")
+
+  financialTransaction FinancialTransaction @relation(fields: [financialTransactionId], references: [id])
+  tag                  Tag                  @relation(fields: [tagId], references: [id])
+
+  @@id([financialTransactionId, tagId])
+  @@map("financial_transaction_tags")
+}
+
+model Attachment {
+  id                     String   @id @default(uuid())
+  financialTransactionId String   @map("financial_transaction_id")
+  fileName               String   @map("file_name")
+  fileType               String   @map("file_type")
+  filePath               String   @map("file_path")
+  fileSize               Int?     @map("file_size")
+  createdAt              DateTime @default(now()) @map("created_at")
+
+  financialTransaction FinancialTransaction @relation(fields: [financialTransactionId], references: [id])
+
+  @@index([financialTransactionId])
+  @@map("attachments")
+}
+
+model SavedFilter {
+  id        Int      @id @default(autoincrement())
+  name      String
+  scope     String   @default("financial_entries")
+  filters   Json
+  favorite  Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("saved_filters")
+}
+
+model RecurringEntry {
+  id              Int      @id @default(autoincrement())
+  name            String
+  description     String
+  amount          Decimal
+  frequency       String
+  nextDate        DateTime @map("next_date")
+  endDate         DateTime? @map("end_date")
+  status          String   @default("Active")
+  category        String?
+  subcategory     String?
+  accountName     String?  @map("account_name")
+  cardName        String?  @map("card_name")
+  paymentMethodId Int?     @map("payment_method_id")
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  paymentMethod PaymentMethod? @relation(fields: [paymentMethodId], references: [id])
+
+  @@index([status])
+  @@index([nextDate])
+  @@map("recurring_entries")
+}
+
+model FinancialEntryAudit {
+  id                     Int      @id @default(autoincrement())
+  financialTransactionId String   @map("financial_transaction_id")
+  action                 String
+  beforeJson             Json?    @map("before_json")
+  afterJson              Json?    @map("after_json")
+  createdAt              DateTime @default(now()) @map("created_at")
+
+  financialTransaction FinancialTransaction @relation(fields: [financialTransactionId], references: [id])
+
+  @@index([financialTransactionId])
+  @@map("financial_entry_audits")
+}
+
+model AIConversation {
+  id        String   @id @default(uuid())
+  title     String
+  favorite  Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  messages AIMessage[]
+
+  @@index([updatedAt])
+  @@map("ai_conversations")
+}
+
+model AIMessage {
+  id             String   @id @default(uuid())
+  conversationId String   @map("conversation_id")
+  role           String
+  content        String
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation AIConversation @relation(fields: [conversationId], references: [id])
+
+  @@index([conversationId])
+  @@index([createdAt])
+  @@map("ai_messages")
+}
+
+model AISetting {
+  id             Int      @id @default(autoincrement())
+  provider       String   @default("local")
+  model          String   @default("local-finance")
+  temperature    Decimal  @default(0.2)
+  language       String   @default("pt-BR")
+  contextLimit   Int      @default(6000) @map("context_limit")
+  apiKeyMasked   String?  @map("api_key_masked")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("ai_settings")
+}
+
+model AIMemory {
+  id        Int      @id @default(autoincrement())
+  kind      String
+  content   String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([kind])
+  @@index([active])
+  @@map("ai_memories")
+}
+
+model AIRecommendation {
+  id        String   @id @default(uuid())
+  title     String
+  message   String
+  impact    Decimal  @default(0)
+  priority  String   @default("Media")
+  source    String   @default("SYSTEM")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([priority])
+  @@index([createdAt])
+  @@map("ai_recommendations")
+}

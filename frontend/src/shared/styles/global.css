@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  background: #f7f8fa;
+  color: #17202a;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button, input, select {
+  font: inherit;
+}
+
+.field {
+  height: 40px;
+  width: 100%;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  padding: 0 12px;
+  font-size: 14px;
+  color: #17202a;
+}
+
+.btn-secondary {
+  display: inline-flex;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #17202a;
+}
+
+.btn-secondary:hover {
+  background: #f8fafc;
+}
+
+.app-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 14px;
+}
+
+.app-table thead {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.app-table th,
+.app-table td {
+  padding: 12px;
+}
+
+.app-table tbody tr {
+  border-top: 1px solid #e2e8f0;
+}
+
+.app-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.badge-gray,
+.badge-blue,
+.badge-green,
+.badge-red {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.badge-gray {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.badge-blue {
+  background: #eef2ff;
+  color: #3454d1;
+}
+
+.badge-green {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.badge-red {
+  background: #fff1f2;
+  color: #be123c;
+}
