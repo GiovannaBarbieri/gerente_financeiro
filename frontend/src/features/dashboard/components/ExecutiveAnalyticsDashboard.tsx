@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { ArrowDownRight, ArrowUpRight, Banknote, CalendarClock, CreditCard, TrendingDown, TrendingUp, WalletCards } from "lucide-react";
 import {
   Bar,
@@ -14,7 +15,7 @@ import {
   XAxis,
   YAxis
 } from "recharts";
-import { Card, Field, SelectField, Stat } from "@shared/components/ui";
+import { Card, Stat } from "@shared/components/ui";
 import { api, brl, currentMonth, formatDate } from "@shared/services/api";
 
 type DashboardData = {
@@ -54,10 +55,8 @@ type DashboardData = {
 
 const COLORS = ["#3454D1", "#16A34A", "#DC2626", "#0891B2", "#7C3AED", "#D97706", "#0F766E", "#BE123C"];
 
-export function ExecutiveAnalyticsDashboard() {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [filters, setFilters] = useState({
+function defaultDashboardFilters() {
+  return {
     month: currentMonth(),
     range: "30d",
     account: "",
@@ -66,7 +65,15 @@ export function ExecutiveAnalyticsDashboard() {
     type: "",
     institution: "",
     tag: ""
-  });
+  };
+}
+
+type DashboardFilterState = ReturnType<typeof defaultDashboardFilters>;
+
+export function ExecutiveAnalyticsDashboard() {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [filters, setFilters] = useState<DashboardFilterState>(() => defaultDashboardFilters());
 
   async function load() {
     setLoading(true);
@@ -135,31 +142,77 @@ export function ExecutiveAnalyticsDashboard() {
   );
 }
 
-export function DashboardFilters({ filters, setFilters, options }: { filters: Record<string, string>; setFilters: (filters: any) => void; options: Record<string, string[]> }) {
-  function update(field: string, value: string) {
-    setFilters((current: Record<string, string>) => ({ ...current, [field]: value }));
+export function DashboardFilters({
+  filters,
+  setFilters,
+  options
+}: {
+  filters: DashboardFilterState;
+  setFilters: (filters: DashboardFilterState | ((current: DashboardFilterState) => DashboardFilterState)) => void;
+  options: Record<string, string[]>;
+}) {
+  function update(field: keyof DashboardFilterState, value: string) {
+    setFilters((current) => ({ ...current, [field]: value }));
+  }
+
+  function resetFilters() {
+    setFilters(defaultDashboardFilters());
   }
 
   return (
-    <section className="rounded-lg border border-line bg-white p-4 shadow-soft">
-      <div className="grid gap-3 md:grid-cols-4 xl:grid-cols-8">
-        <Field label="Período"><input className="field" type="month" value={filters.month} onChange={(event) => update("month", event.target.value)} /></Field>
-        <Field label="Janela">
-          <select className="field" value={filters.range} onChange={(event) => update("range", event.target.value)}>
+    <section className="rounded-lg border border-line bg-white px-4 py-3 shadow-soft">
+      <div className="grid items-end gap-x-3 gap-y-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-9">
+        <FilterField label="Período">
+          <input className={filterControlClass} type="month" value={filters.month} onChange={(event) => update("month", event.target.value)} />
+        </FilterField>
+        <FilterField label="Janela">
+          <select className={filterSelectClass} value={filters.range} onChange={(event) => update("range", event.target.value)}>
             <option value="7d">7 dias</option>
             <option value="30d">30 dias</option>
             <option value="90d">90 dias</option>
             <option value="12m">12 meses</option>
           </select>
-        </Field>
-        <SelectField label="Conta" value={filters.account} onChange={(value) => update("account", value)} options={options.accounts || []} />
-        <SelectField label="Cartão" value={filters.card} onChange={(value) => update("card", value)} options={options.cards || []} />
-        <SelectField label="Categoria" value={filters.category} onChange={(value) => update("category", value)} options={options.categories || []} />
-        <SelectField label="Tipo" value={filters.type} onChange={(value) => update("type", value)} options={options.types || []} />
-        <SelectField label="Instituição" value={filters.institution} onChange={(value) => update("institution", value)} options={options.institutions || []} />
-        <SelectField label="Tags" value={filters.tag} onChange={(value) => update("tag", value)} options={options.tags || []} />
+        </FilterField>
+        <FilterSelect label="Conta" value={filters.account} onChange={(value) => update("account", value)} options={options.accounts || []} />
+        <FilterSelect label="Cartão" value={filters.card} onChange={(value) => update("card", value)} options={options.cards || []} />
+        <FilterSelect label="Categoria" value={filters.category} onChange={(value) => update("category", value)} options={options.categories || []} />
+        <FilterSelect label="Tipo" value={filters.type} onChange={(value) => update("type", value)} options={options.types || []} />
+        <FilterSelect label="Instituição" value={filters.institution} onChange={(value) => update("institution", value)} options={options.institutions || []} />
+        <FilterSelect label="Tags" value={filters.tag} onChange={(value) => update("tag", value)} options={options.tags || []} />
+        <button
+          type="button"
+          onClick={resetFilters}
+          className="h-9 w-full rounded-md border border-line bg-white px-3 text-sm font-semibold text-ink transition hover:bg-slate-50 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/10"
+        >
+          Limpar filtros
+        </button>
       </div>
     </section>
+  );
+}
+
+const filterControlClass = "h-9 w-full rounded-md border border-line bg-white px-3 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10";
+const filterSelectClass = `${filterControlClass} cursor-pointer pr-8`;
+
+function FilterField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="grid min-w-0 gap-1">
+      <span className="h-4 text-xs font-semibold text-muted">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function FilterSelect({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: string[] }) {
+  return (
+    <FilterField label={label}>
+      <select className={filterSelectClass} value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value="">Todos</option>
+        {options.map((option) => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+      </select>
+    </FilterField>
   );
 }
 
