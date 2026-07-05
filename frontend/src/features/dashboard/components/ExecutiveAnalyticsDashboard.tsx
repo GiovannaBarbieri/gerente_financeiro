@@ -85,10 +85,10 @@ export function ExecutiveAnalyticsDashboard() {
 
   return (
     <div className="grid gap-5">
-      <section className="rounded-lg border border-line bg-white px-5 py-4">
+      <header>
         <h2 className="text-xl font-semibold text-ink">Dashboard Executivo</h2>
-        <p className="mt-1 text-sm text-muted">Análise do comportamento financeiro com base nos lançamentos existentes.</p>
-      </section>
+        <p className="mt-1 text-sm text-muted">Análise financeira do período selecionado.</p>
+      </header>
 
       <DashboardFilters filters={filters} setFilters={setFilters} options={data.filters} />
       {loading && <p className="text-sm text-muted">Atualizando indicadores...</p>}
