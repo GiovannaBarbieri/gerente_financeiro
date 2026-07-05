@@ -222,12 +222,11 @@ export function App() {
     <main className="min-h-screen bg-surface">
       <header className="border-b border-line bg-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
             <div>
               <h1 className="text-2xl font-semibold tracking-normal text-ink">Gerente Financeiro</h1>
               <p className="mt-1 text-sm text-muted">Controle financeiro simples, importações e análises mensais.</p>
             </div>
-            <input className="h-10 rounded-md border border-line bg-white px-3 text-sm" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
           </div>
           <nav className="flex flex-wrap gap-2">
             {menu.map(([id, label, Icon]) => (
